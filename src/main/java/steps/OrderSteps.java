@@ -1,5 +1,4 @@
 package steps;
-
 import api.ApiEndpoint;
 import io.qameta.allure.Step;
 import io.restassured.builder.RequestSpecBuilder;

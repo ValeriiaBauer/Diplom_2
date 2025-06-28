@@ -1,5 +1,4 @@
 package tests;
-
 import io.qameta.allure.Description;
 import io.qameta.allure.junit4.DisplayName;
 import models.UserCreateAndEditRequest;
