@@ -1,15 +1,16 @@
 package tests;
+
 import io.qameta.allure.Description;
 import io.qameta.allure.junit4.DisplayName;
 import models.UserCreateAndEditRequest;
 import models.UserLoginRequest;
 import org.junit.After;
+import org.junit.Before;
 import org.junit.Test;
 import steps.OrderSteps;
 import steps.UserSteps;
 import java.util.List;
 import static org.hamcrest.CoreMatchers.*;
-
 
 public class OrderListTest {
 
@@ -18,6 +19,14 @@ public class OrderListTest {
     private static final String USER_NAME = "Тестовый Пользователь";
     private String currentEmail;
     private boolean skipCleanup = false;
+    private UserSteps userSteps;
+    private OrderSteps orderSteps;
+
+    @Before
+    public void setUp() {
+        userSteps = new UserSteps();
+        orderSteps = new OrderSteps();
+    }
 
     @After
     public void cleanup() {
@@ -28,7 +37,6 @@ public class OrderListTest {
 
     private void deleteTestUser(String email) {
         try {
-            UserSteps userSteps = new UserSteps();
             userSteps.deleteUserAfterLogin(new UserLoginRequest(email, VALID_PASSWORD));
         } catch (Exception e) {
             System.out.println("Ошибка при удалении пользователя: " + e.getMessage());
@@ -40,12 +48,16 @@ public class OrderListTest {
         return currentEmail;
     }
 
+    private void createTestUser() {
+        String email = generateUniqueEmail();
+        userSteps.createUser(new UserCreateAndEditRequest(email, VALID_PASSWORD, USER_NAME));
+    }
+
     @Test
     @DisplayName("Получение списка заказов без авторизации")
     @Description("Проверка невозможности получения списка заказов без авторизации")
     public void getOrdersWithoutAuthorizationShouldFail() {
         skipCleanup = true;
-        OrderSteps orderSteps = new OrderSteps();
         orderSteps.getOrdersWithoutAuth()
                 .assertThat()
                 .statusCode(401)
@@ -57,12 +69,8 @@ public class OrderListTest {
     @DisplayName("Получение списка заказов с авторизацией")
     @Description("Проверка успешного получения списка заказов авторизованного пользователя")
     public void getOrdersWithAuthorizationShouldSucceed() {
-        // Создаем тестового пользователя
-        String email = generateUniqueEmail();
-        UserSteps userSteps = new UserSteps();
-        userSteps.createUser(new UserCreateAndEditRequest(email, VALID_PASSWORD, USER_NAME));
-        OrderSteps orderSteps = new OrderSteps();
-        orderSteps.getOrdersWithAuth(new UserLoginRequest(email, VALID_PASSWORD))
+        createTestUser();
+        orderSteps.getOrdersWithAuth(new UserLoginRequest(currentEmail, VALID_PASSWORD))
                 .assertThat()
                 .statusCode(200)
                 .body("success", equalTo(true))

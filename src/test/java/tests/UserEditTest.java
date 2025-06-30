@@ -1,4 +1,5 @@
 package tests;
+
 import io.qameta.allure.Description;
 import io.qameta.allure.junit4.DisplayName;
 import models.UserCreateAndEditRequest;
@@ -7,8 +8,7 @@ import org.junit.After;
 import org.junit.Before;
 import org.junit.Test;
 import steps.UserSteps;
-import static org.hamcrest.CoreMatchers.equalTo;
-
+import static org.hamcrest.CoreMatchers.*;
 
 public class UserEditTest {
 
@@ -18,19 +18,42 @@ public class UserEditTest {
     private static final String UPDATED_EMAIL = "updated.user+%d@example.com";
     private static final String UPDATED_PASSWORD = "UpdatedPass123!";
     private static final String UPDATED_NAME = "Обновленное Имя";
+    private static final String UNAUTHORIZED_ERROR = "You should be authorised";
+    private static final String INVALID_CREDENTIALS_ERROR = "email or password are incorrect";
+
     private String currentEmail;
     private UserSteps userSteps;
-    private boolean skipCleanup = false; // Добавляем недостающую переменную
+    private boolean skipCleanup = false;
 
     @Before
     public void setup() {
         userSteps = new UserSteps();
         currentEmail = String.format(BASE_EMAIL, System.currentTimeMillis());
+
+        if (!"shouldNotUpdateNonExistingUser".equals(getCurrentTestName())) {
+            userSteps.createUser(new UserCreateAndEditRequest(
+                    currentEmail, INITIAL_PASSWORD, INITIAL_NAME
+            ));
+            userSteps.login(new UserLoginRequest(currentEmail, INITIAL_PASSWORD))
+                    .assertThat()
+                    .statusCode(200)
+                    .body("success", equalTo(true))
+                    .body("accessToken", notNullValue());
+        }
+    }
+
+    private String getCurrentTestName() {
+        for (StackTraceElement element : Thread.currentThread().getStackTrace()) {
+            if (element.getClassName().equals(this.getClass().getName())) {
+                return element.getMethodName();
+            }
+        }
+        return "";
     }
 
     @After
     public void cleanup() {
-        if (!skipCleanup) { // Теперь переменная доступна
+        if (!skipCleanup) {
             try {
                 userSteps.deleteUserAfterLogin(new UserLoginRequest(currentEmail, INITIAL_PASSWORD));
                 userSteps.deleteUserAfterLogin(new UserLoginRequest(
@@ -47,76 +70,70 @@ public class UserEditTest {
     @DisplayName("Обновление email авторизованного пользователя")
     @Description("Проверка успешного обновления email с авторизацией")
     public void shouldUpdateEmailWithAuthorization() {
-        userSteps.createUser(new UserCreateAndEditRequest(
-                currentEmail, INITIAL_PASSWORD, INITIAL_NAME
-        ));
         String newEmail = String.format(UPDATED_EMAIL, System.currentTimeMillis());
+
         userSteps.editUserWithAuth(
                         new UserLoginRequest(currentEmail, INITIAL_PASSWORD),
                         new UserCreateAndEditRequest(newEmail, INITIAL_PASSWORD, INITIAL_NAME)
-                )
-                .assertThat()
+                ).assertThat()
                 .statusCode(200)
                 .body("success", equalTo(true))
-                .body("user.email", equalTo(newEmail.toLowerCase()));
+                .body("user.email", equalTo(newEmail.toLowerCase()))
+                .body("user.name", equalTo(INITIAL_NAME));
     }
 
     @Test
     @DisplayName("Попытка обновления email без авторизации")
     @Description("Проверка отказа в обновлении без авторизации")
     public void shouldNotUpdateEmailWithoutAuthorization() {
-        skipCleanup = true; // Используем переменную
-        userSteps.createUser(new UserCreateAndEditRequest(
-                currentEmail, INITIAL_PASSWORD, INITIAL_NAME
-        ));
+        skipCleanup = true;
+
         userSteps.editUserWithoutAuth(new UserCreateAndEditRequest(
                         String.format(UPDATED_EMAIL, System.currentTimeMillis()),
                         INITIAL_PASSWORD,
                         INITIAL_NAME
-                ))
-                .assertThat()
+                )).assertThat()
                 .statusCode(401)
-                .body("success", equalTo(false));
+                .body("success", equalTo(false))
+                .body("message", equalTo(UNAUTHORIZED_ERROR));
     }
 
     @Test
     @DisplayName("Обновление пароля авторизованного пользователя")
     @Description("Проверка успешного обновления пароля с последующей авторизацией")
     public void shouldUpdatePasswordWithAuthorization() {
-        userSteps.createUser(new UserCreateAndEditRequest(
-                currentEmail, INITIAL_PASSWORD, INITIAL_NAME
-        ));
         userSteps.editUserWithAuth(
                         new UserLoginRequest(currentEmail, INITIAL_PASSWORD),
                         new UserCreateAndEditRequest(
                                 currentEmail, UPDATED_PASSWORD, INITIAL_NAME
                         )
-                )
-                .assertThat()
+                ).assertThat()
                 .statusCode(200)
-                .body("success", equalTo(true));
+                .body("success", equalTo(true))
+                .body("user.email", equalTo(currentEmail.toLowerCase()))
+                .body("user.name", equalTo(INITIAL_NAME));
+
         userSteps.login(new UserLoginRequest(currentEmail, UPDATED_PASSWORD))
                 .assertThat()
                 .statusCode(200)
-                .body("success", equalTo(true));
+                .body("success", equalTo(true))
+                .body("accessToken", notNullValue())
+                .body("refreshToken", notNullValue());
     }
 
     @Test
     @DisplayName("Обновление имени авторизованного пользователя")
     @Description("Проверка успешного обновления имени пользователя")
     public void shouldUpdateNameWithAuthorization() {
-        userSteps.createUser(new UserCreateAndEditRequest(
-                currentEmail, INITIAL_PASSWORD, INITIAL_NAME
-        ));
         userSteps.editUserWithAuth(
                         new UserLoginRequest(currentEmail, INITIAL_PASSWORD),
                         new UserCreateAndEditRequest(
                                 currentEmail, INITIAL_PASSWORD, UPDATED_NAME
                         )
-                )
-                .assertThat()
+                ).assertThat()
                 .statusCode(200)
                 .body("success", equalTo(true))
+                .body("user.email", equalTo(currentEmail.toLowerCase()))
                 .body("user.name", equalTo(UPDATED_NAME));
     }
 
@@ -125,14 +142,15 @@ public class UserEditTest {
     @Description("Проверка обработки попытки обновления несуществующего пользователя")
     public void shouldNotUpdateNonExistingUser() {
         skipCleanup = true;
+
         userSteps.editUserWithAuth(
                         new UserLoginRequest("nonexisting@example.com", "password"),
                         new UserCreateAndEditRequest(
                                 "new@example.com", "newpass", "New Name"
                         )
-                )
-                .assertThat()
+                ).assertThat()
                 .statusCode(401)
-                .body("success", equalTo(false));
+                .body("success", equalTo(false))
+                .body("message", equalTo(INVALID_CREDENTIALS_ERROR));
     }
 }
