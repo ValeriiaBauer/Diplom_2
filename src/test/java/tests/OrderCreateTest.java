@@ -1,4 +1,5 @@
 package tests;
+
 import io.qameta.allure.Description;
 import io.qameta.allure.junit4.DisplayName;
 import io.restassured.response.ValidatableResponse;
@@ -6,6 +7,7 @@ import models.OrderCreateRequest;
 import models.UserCreateAndEditRequest;
 import models.UserLoginRequest;
 import org.junit.After;
+import org.junit.Before;
 import org.junit.Test;
 import steps.OrderSteps;
 import steps.UserSteps;
@@ -13,7 +15,6 @@ import java.util.ArrayList;
 import java.util.List;
 import static org.hamcrest.CoreMatchers.equalTo;
 import static org.hamcrest.CoreMatchers.isA;
-
 
 public class OrderCreateTest {
 
@@ -25,6 +26,15 @@ public class OrderCreateTest {
 
     private final List<String> ingredients = new ArrayList<>();
     private boolean skipCleanup = false;
+    private UserSteps userSteps;
+    private OrderSteps orderSteps;
+
+    @Before
+    public void setUp() {
+        userSteps = new UserSteps();
+        orderSteps = new OrderSteps();
+        userSteps.createUser(new UserCreateAndEditRequest(TEST_EMAIL, TEST_PASSWORD, TEST_NAME));
+    }
 
     @After
     public void cleanup() {
@@ -36,7 +46,6 @@ public class OrderCreateTest {
 
     private void deleteTestUser() {
         try {
-            UserSteps userSteps = new UserSteps();
             UserLoginRequest loginRequest = new UserLoginRequest(TEST_EMAIL, TEST_PASSWORD);
             userSteps.deleteUserAfterLogin(loginRequest);
         } catch (Exception e) {
@@ -48,17 +57,12 @@ public class OrderCreateTest {
     @DisplayName("Создание заказа после авторизации")
     @Description("Проверка возможности создания заказа авторизованным пользователем")
     public void orderCreateWithAuthorization() {
-
-        UserSteps userSteps = new UserSteps();
-        userSteps.createUser(new UserCreateAndEditRequest(TEST_EMAIL, TEST_PASSWORD, TEST_NAME));
         ingredients.add(VALID_INGREDIENT);
         OrderCreateRequest orderRequest = new OrderCreateRequest(ingredients);
 
-        // Выполняем тест
-        ValidatableResponse response = new OrderSteps()
+        ValidatableResponse response = orderSteps
                 .createOrderWithAuth(new UserLoginRequest(TEST_EMAIL, TEST_PASSWORD), orderRequest);
 
-        // Проверяем результаты
         response.assertThat()
                 .statusCode(200)
                 .body("success", equalTo(true))
@@ -72,7 +76,7 @@ public class OrderCreateTest {
         ingredients.add(VALID_INGREDIENT);
         OrderCreateRequest orderRequest = new OrderCreateRequest(ingredients);
 
-        ValidatableResponse response = new OrderSteps().createOrderWithoutAuth(orderRequest);
+        ValidatableResponse response = orderSteps.createOrderWithoutAuth(orderRequest);
 
         response.assertThat()
                 .statusCode(200)
@@ -86,12 +90,7 @@ public class OrderCreateTest {
     public void orderCreateWithoutIngredients() {
         skipCleanup = true;
 
-
-        UserSteps userSteps = new UserSteps();
-        userSteps.createUser(new UserCreateAndEditRequest(TEST_EMAIL, TEST_PASSWORD, TEST_NAME));
-
-
-        ValidatableResponse response = new OrderSteps()
+        ValidatableResponse response = orderSteps
                 .createOrderWithAuth(new UserLoginRequest(TEST_EMAIL, TEST_PASSWORD),
                         new OrderCreateRequest(ingredients));
 
@@ -105,15 +104,10 @@ public class OrderCreateTest {
     @DisplayName("Создание заказа с неверным ингредиентом")
     @Description("Проверка обработки невалидного ингредиента")
     public void orderCreateWithInvalidIngredient() {
-
-        UserSteps userSteps = new UserSteps();
-        userSteps.createUser(new UserCreateAndEditRequest(TEST_EMAIL, TEST_PASSWORD, TEST_NAME));
-
         ingredients.add(VALID_INGREDIENT);
         ingredients.add(INVALID_INGREDIENT);
 
-
-        ValidatableResponse response = new OrderSteps()
+        ValidatableResponse response = orderSteps
                 .createOrderWithAuth(new UserLoginRequest(TEST_EMAIL, TEST_PASSWORD),
                         new OrderCreateRequest(ingredients));
 

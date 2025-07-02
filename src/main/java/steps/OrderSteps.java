@@ -7,6 +7,7 @@ import io.restassured.response.Response;
 import io.restassured.response.ValidatableResponse;
 import io.restassured.specification.RequestSpecification;
 import models.OrderCreateRequest;
+import models.UserCreateAndEditRequest;
 import models.UserLoginRequest;
 import models.UserLoginResponse;
 import static io.restassured.RestAssured.given;
